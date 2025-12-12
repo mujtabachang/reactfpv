@@ -2,10 +2,10 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Rates, InputMode, Calibration, CameraMode } from '../types';
+import { Rates, InputMode, Calibration, CameraMode, ChannelMap, WindSettings } from '../types';
 import { calculateRate, applyDeadband } from '../services/physics';
 import { normalizeInput } from '../services/gamepad';
-import { GRAVITY, DRAG, THRUST_POWER, AXIS_MAP } from '../constants';
+import { DronePhysicsEngine, PhysicsState } from '../services/dronePhysics';
 
 interface DroneProps {
   rates: Rates;
@@ -15,6 +15,9 @@ interface DroneProps {
   setTelemetry: (data: { speed: number; altitude: number; throttle: number; distance: number }) => void;
   resetSignal: number;
   calibration: Calibration;
+  channelMap: ChannelMap;
+  hidChannels: number[];
+  windSettings: WindSettings;
 }
 
 // Visual Components
@@ -127,30 +130,41 @@ const DroneModel = ({ throttleRef }: { throttleRef: React.MutableRefObject<numbe
     )
 }
 
-const Drone: React.FC<DroneProps> = ({ rates, inputMode, cameraTilt, cameraMode, setTelemetry, resetSignal, calibration }) => {
+const Drone: React.FC<DroneProps> = ({ rates, inputMode, cameraTilt, cameraMode, setTelemetry, resetSignal, calibration, channelMap, hidChannels, windSettings }) => {
   const { camera } = useThree();
   const meshRef = useRef<THREE.Group>(null);
-  
+
+  // Physics engine instance
+  const physicsEngine = useMemo(() => new DronePhysicsEngine(), []);
+
   // Physics state
-  const position = useRef(new THREE.Vector3(0, 1, 0));
-  const velocity = useRef(new THREE.Vector3(0, 0, 0));
-  const quaternion = useRef(new THREE.Quaternion());
-  
+  const physicsState = useRef<PhysicsState>(DronePhysicsEngine.createInitialState());
+
   // Input State
   const activeKeys = useRef<Set<string>>(new Set());
   const virtualSticks = useRef({ throttle: 0, yaw: 0, pitch: 0, roll: 0 });
-  
+
   // Shared ref for visuals (passed to children to avoid re-renders)
   const throttleRef = useRef(0);
 
-  // Reuse vector objects
-  const vectors = useMemo(() => ({
-    thrust: new THREE.Vector3(),
-    gravity: new THREE.Vector3(0, -GRAVITY, 0),
-    drag: new THREE.Vector3(),
-    up: new THREE.Vector3(0, 1, 0),
-    tiltAxis: new THREE.Vector3(1, 0, 0),
-  }), []);
+  // Update wind settings when they change
+  useEffect(() => {
+    const angleRad = THREE.MathUtils.degToRad(windSettings.directionAngle);
+    const direction = new THREE.Vector3(
+      Math.sin(angleRad),  // X component
+      0,                    // No vertical wind direction
+      Math.cos(angleRad)   // Z component
+    );
+
+    physicsEngine.updateWindConfig({
+      enabled: windSettings.enabled,
+      baseSpeed: windSettings.baseSpeed,
+      direction: direction,
+      gustStrength: windSettings.gustStrength,
+      gustFrequency: windSettings.gustFrequency,
+      turbulenceScale: windSettings.turbulenceScale,
+    });
+  }, [windSettings, physicsEngine]);
 
   // Keyboard Event Listeners
   useEffect(() => {
@@ -167,55 +181,60 @@ const Drone: React.FC<DroneProps> = ({ rates, inputMode, cameraTilt, cameraMode,
 
   // Reset logic
   useEffect(() => {
-    position.current.set(0, 2, 0);
-    velocity.current.set(0, 0, 0);
-    quaternion.current.set(0, 0, 0, 1);
+    physicsState.current = DronePhysicsEngine.createInitialState();
     virtualSticks.current.throttle = 0; // Reset throttle on respawn
     throttleRef.current = 0;
     if (meshRef.current) {
-        meshRef.current.position.copy(position.current);
-        meshRef.current.quaternion.copy(quaternion.current);
+        meshRef.current.position.copy(physicsState.current.position);
+        meshRef.current.quaternion.copy(physicsState.current.quaternion);
     }
   }, [resetSignal]);
 
   useFrame((state, delta) => {
     if (!meshRef.current) return;
-    const dt = Math.min(delta, 0.1);
+    const dt = Math.min(delta, 0.05); // Clamp to prevent instability
 
     let throttle = 0;
     let yaw = 0;
     let pitch = 0;
     let roll = 0;
 
-    if (inputMode === 'GAMEPAD') {
+    if (inputMode === 'WEBHID') {
+        // WebHID input from RadioMaster - use channel map to get correct channels
+        // All channels are normalized to -1 to 1
+        const rawThrottle = normalizeInput(hidChannels[channelMap.throttle] ?? 0, calibration.throttle);
+        const rawYaw = normalizeInput(hidChannels[channelMap.yaw] ?? 0, calibration.yaw);
+        const rawPitch = normalizeInput(hidChannels[channelMap.pitch] ?? 0, calibration.pitch);
+        const rawRoll = normalizeInput(hidChannels[channelMap.roll] ?? 0, calibration.roll);
+
+        // Convert throttle from -1 to 1 range to 0 to 1
+        throttle = Math.max(0, Math.min(1, (rawThrottle + 1) / 2));
+        yaw = applyDeadband(rawYaw);
+        pitch = applyDeadband(rawPitch);
+        roll = applyDeadband(rawRoll);
+    } else if (inputMode === 'GAMEPAD') {
         const gamepads = navigator.getGamepads();
         const gp = gamepads[0] || gamepads[1];
-        
+
         if (gp) {
-            // Apply calibration normalization
-            // Normalized returns -1 to 1 based on calibration
-            const rawThrottle = normalizeInput(gp.axes[AXIS_MAP.THROTTLE], calibration.throttle);
-            const rawYaw = normalizeInput(gp.axes[AXIS_MAP.YAW], calibration.yaw);
-            const rawPitch = normalizeInput(gp.axes[AXIS_MAP.PITCH], calibration.pitch);
-            const rawRoll = normalizeInput(gp.axes[AXIS_MAP.ROLL], calibration.roll);
+            // Use channel map to get correct axis indices
+            const rawThrottle = normalizeInput(gp.axes[channelMap.throttle] ?? 0, calibration.throttle);
+            const rawYaw = normalizeInput(gp.axes[channelMap.yaw] ?? 0, calibration.yaw);
+            const rawPitch = normalizeInput(gp.axes[channelMap.pitch] ?? 0, calibration.pitch);
+            const rawRoll = normalizeInput(gp.axes[channelMap.roll] ?? 0, calibration.roll);
 
             // Map throttle from [-1, 1] to [0, 1]
-            // Standard Gamepad: Up is -1. 
-            // Normalize Input handles inversion if the setting is checked.
-            // But we assume the result of NormalizeInput follows standard: Up = -1, Down = 1.
-            // So for throttle: Up (-1) should be 1.0 (Full), Down (1) should be 0.0 (Idle)
+            // Standard Gamepad: Up is -1.
             throttle = Math.max(0, Math.min(1, (rawThrottle * -1 + 1) / 2));
-            
+
             // Yaw: Left is -1. Standard axes usually left is -1.
-            yaw = applyDeadband(rawYaw) * -1; // -1 to invert logic if needed, depends on sim
-            
-            // Pitch: Up is -1. Sim needs Forward (Up) to be negative pitch rate? 
-            // In ThreeJS quaternion: +X rotation is down? 
-            // Let's stick to existing logic: `* -1`
+            yaw = applyDeadband(rawYaw) * -1;
+
+            // Pitch: Up is -1.
             pitch = applyDeadband(rawPitch) * -1;
-            
+
             // Roll: Right is 1.
-            roll = applyDeadband(rawRoll); 
+            roll = applyDeadband(rawRoll);
         }
     } else {
         // Keyboard Input (Virtual Sticks)
@@ -231,21 +250,21 @@ const Drone: React.FC<DroneProps> = ({ rates, inputMode, cameraTilt, cameraMode,
 
         // Yaw (Left Hand: A/D)
         let targetYaw = 0;
-        if (keys.has('KeyA')) targetYaw = 1; 
+        if (keys.has('KeyA')) targetYaw = 1;
         if (keys.has('KeyD')) targetYaw = -1;
         virtualSticks.current.yaw += (targetYaw - virtualSticks.current.yaw) * stickSpeed;
         yaw = virtualSticks.current.yaw;
 
         // Pitch (Right Hand: Arrows Up/Down)
         let targetPitch = 0;
-        if (keys.has('ArrowUp')) targetPitch = -1; 
+        if (keys.has('ArrowUp')) targetPitch = -1;
         if (keys.has('ArrowDown')) targetPitch = 1;
         virtualSticks.current.pitch += (targetPitch - virtualSticks.current.pitch) * stickSpeed;
         pitch = virtualSticks.current.pitch;
 
         // Roll (Right Hand: Arrows Left/Right)
         let targetRoll = 0;
-        if (keys.has('ArrowLeft')) targetRoll = -1; 
+        if (keys.has('ArrowLeft')) targetRoll = -1;
         if (keys.has('ArrowRight')) targetRoll = 1;
         virtualSticks.current.roll += (targetRoll - virtualSticks.current.roll) * stickSpeed;
         roll = virtualSticks.current.roll;
@@ -254,71 +273,52 @@ const Drone: React.FC<DroneProps> = ({ rates, inputMode, cameraTilt, cameraMode,
     // Update shared ref for visuals
     throttleRef.current = throttle;
 
-    // Physics Update
+    // Calculate angular rates from stick input using Betaflight-style rates (deg/s -> rad/s)
     const yawRate = THREE.MathUtils.degToRad(calculateRate(yaw, rates.yaw));
     const pitchRate = THREE.MathUtils.degToRad(calculateRate(pitch, rates.pitch));
     const rollRate = THREE.MathUtils.degToRad(calculateRate(roll, rates.roll));
 
-    // Update Rotation (Local Acro)
-    const qPitch = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), pitchRate * dt);
-    const qYaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), yawRate * dt);
-    const qRoll = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,-1), rollRate * dt);
-    
-    quaternion.current.multiply(qPitch);
-    quaternion.current.multiply(qYaw);
-    quaternion.current.multiply(qRoll);
-    quaternion.current.normalize();
-
-    // Update Velocity
-    velocity.current.addScaledVector(vectors.gravity, dt);
-    
-    vectors.thrust.copy(vectors.up).applyQuaternion(quaternion.current);
-    vectors.thrust.multiplyScalar(throttle * THRUST_POWER * dt);
-    velocity.current.add(vectors.thrust);
-
-    vectors.drag.copy(velocity.current).multiplyScalar(-DRAG * dt);
-    velocity.current.add(vectors.drag);
-
-    // Update Position
-    position.current.addScaledVector(velocity.current, dt);
-
-    // Floor Collision
-    if (position.current.y < 0.2) {
-      position.current.y = 0.2;
-      velocity.current.y = 0;
-      velocity.current.multiplyScalar(0.8);
-    }
+    // Run physics simulation step
+    physicsState.current = physicsEngine.step(
+      physicsState.current,
+      throttle,
+      rollRate,
+      pitchRate,
+      yawRate,
+      dt,
+      state.clock.elapsedTime
+    );
 
     // Apply to ThreeJS Objects
-    meshRef.current.position.copy(position.current);
-    meshRef.current.quaternion.copy(quaternion.current);
+    meshRef.current.position.copy(physicsState.current.position);
+    meshRef.current.quaternion.copy(physicsState.current.quaternion);
 
     // Update Camera based on Mode
     if (cameraMode === 'FPV') {
-        camera.position.copy(position.current);
-        camera.quaternion.copy(quaternion.current);
+        camera.position.copy(physicsState.current.position);
+        camera.quaternion.copy(physicsState.current.quaternion);
         // Apply camera tilt (Rotate Up relative to drone)
         camera.rotateX(THREE.MathUtils.degToRad(cameraTilt));
     } else if (cameraMode === 'THIRD_PERSON') {
         // Chase cam: Locked offset relative to drone rotation
         // Offset: Up and Behind
         const offset = new THREE.Vector3(0, 1.0, 2.5);
-        offset.applyQuaternion(quaternion.current);
-        camera.position.copy(position.current).add(offset);
-        camera.lookAt(position.current);
+        offset.applyQuaternion(physicsState.current.quaternion);
+        camera.position.copy(physicsState.current.position).add(offset);
+        camera.lookAt(physicsState.current.position);
     } else if (cameraMode === 'LOS') {
         // Line of Sight: Static position
         camera.position.set(0, 1.7, 5); // Standing height, slightly behind origin
-        camera.lookAt(position.current);
+        camera.lookAt(physicsState.current.position);
     }
-    
-    // Telemetry
+
+    // Telemetry - update at ~10Hz
     if (state.clock.elapsedTime % 0.1 < 0.02) {
         setTelemetry({
-            speed: velocity.current.length() * 3.6,
-            altitude: position.current.y,
-            throttle: throttle * 100,
-            distance: position.current.length()
+            speed: physicsState.current.velocity.length() * 3.6, // m/s to km/h
+            altitude: physicsState.current.position.y,           // meters
+            throttle: throttle * 100,                            // percentage
+            distance: physicsState.current.position.length()     // meters from origin
         });
     }
   });

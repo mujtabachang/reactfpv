@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Settings, RefreshCw, Gamepad2, Keyboard, Info } from 'lucide-react';
+import { Settings, RefreshCw, Gamepad2, Keyboard, Usb } from 'lucide-react';
 import { InputMode, CameraMode } from '../types';
 
 interface HUDProps {
@@ -13,25 +13,43 @@ interface HUDProps {
   cameraMode: CameraMode;
   onOpenSettings: () => void;
   onReset: () => void;
+  onConnectHID: () => void;
 }
 
-const HUD: React.FC<HUDProps> = ({ 
-  speed, 
-  altitude, 
-  throttle, 
-  fps, 
+const HUD: React.FC<HUDProps> = ({
+  speed,
+  altitude,
+  throttle,
+  fps,
   controllerConnected,
   inputMode,
   cameraMode,
   onOpenSettings,
-  onReset
+  onReset,
+  onConnectHID
 }) => {
   return (
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-6">
       {/* Top Bar */}
       <div className="flex justify-between items-start pointer-events-auto">
         <div className="flex flex-col gap-2">
-           {inputMode === 'GAMEPAD' ? (
+           {inputMode === 'WEBHID' ? (
+               <>
+                <div className={`flex items-center gap-2 px-3 py-1 rounded bg-black/50 backdrop-blur ${controllerConnected ? 'text-green-400' : 'text-red-400'}`}>
+                    <Usb size={18} />
+                    <span className="text-xs font-mono font-bold">{controllerConnected ? 'RADIO CONNECTED' : 'NO RADIO'}</span>
+                </div>
+                {!controllerConnected && (
+                    <button
+                      onClick={onConnectHID}
+                      className="flex items-center gap-2 px-3 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors"
+                    >
+                      <Usb size={16} />
+                      Connect RadioMaster
+                    </button>
+                )}
+               </>
+           ) : inputMode === 'GAMEPAD' ? (
                <>
                 <div className={`flex items-center gap-2 px-3 py-1 rounded bg-black/50 backdrop-blur ${controllerConnected ? 'text-green-400' : 'text-red-400'}`}>
                     <Gamepad2 size={18} />

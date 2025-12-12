@@ -53,6 +53,24 @@ export interface GamepadState {
   isConnected: boolean;
 }
 
-export type InputMode = 'GAMEPAD' | 'KEYBOARD';
+export type InputMode = 'GAMEPAD' | 'KEYBOARD' | 'WEBHID';
 
 export type CameraMode = 'FPV' | 'THIRD_PERSON' | 'LOS';
+
+// Channel mapping - which input channel maps to which control
+export interface ChannelMap {
+  throttle: number; // Channel index (0-7)
+  yaw: number;
+  pitch: number;
+  roll: number;
+}
+
+// Wind configuration for physics simulation
+export interface WindSettings {
+  enabled: boolean;
+  baseSpeed: number;        // m/s - constant wind speed (0-20)
+  directionAngle: number;   // degrees - wind direction (0-360, 0 = North/+Z)
+  gustStrength: number;     // m/s - additional gust magnitude (0-10)
+  gustFrequency: number;    // Hz - how often gusts occur (0-2)
+  turbulenceScale: number;  // 0-1 - intensity of random turbulence
+}
