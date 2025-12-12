@@ -1,0 +1,5 @@
+{
+  "name": "ReactFPV Simulator",
+  "description": "A 3D FPV drone racing simulator with realistic physics, Betaflight-style rate tuning, and USB gamepad support.",
+  "requestFramePermissions": []
+}
