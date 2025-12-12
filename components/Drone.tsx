@@ -2,7 +2,7 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Rates, InputMode, Calibration } from '../types';
+import { Rates, InputMode, Calibration, CameraMode } from '../types';
 import { calculateRate, applyDeadband } from '../services/physics';
 import { normalizeInput } from '../services/gamepad';
 import { GRAVITY, DRAG, THRUST_POWER, AXIS_MAP } from '../constants';
@@ -11,6 +11,7 @@ interface DroneProps {
   rates: Rates;
   inputMode: InputMode;
   cameraTilt: number; // in degrees
+  cameraMode: CameraMode;
   setTelemetry: (data: { speed: number; altitude: number; throttle: number; distance: number }) => void;
   resetSignal: number;
   calibration: Calibration;
@@ -126,7 +127,7 @@ const DroneModel = ({ throttleRef }: { throttleRef: React.MutableRefObject<numbe
     )
 }
 
-const Drone: React.FC<DroneProps> = ({ rates, inputMode, cameraTilt, setTelemetry, resetSignal, calibration }) => {
+const Drone: React.FC<DroneProps> = ({ rates, inputMode, cameraTilt, cameraMode, setTelemetry, resetSignal, calibration }) => {
   const { camera } = useThree();
   const meshRef = useRef<THREE.Group>(null);
   
@@ -292,11 +293,24 @@ const Drone: React.FC<DroneProps> = ({ rates, inputMode, cameraTilt, setTelemetr
     meshRef.current.position.copy(position.current);
     meshRef.current.quaternion.copy(quaternion.current);
 
-    // Update Camera (FPV with Tilt)
-    camera.position.copy(position.current);
-    camera.quaternion.copy(quaternion.current);
-    // Apply camera tilt (Rotate Up relative to drone)
-    camera.rotateX(THREE.MathUtils.degToRad(cameraTilt));
+    // Update Camera based on Mode
+    if (cameraMode === 'FPV') {
+        camera.position.copy(position.current);
+        camera.quaternion.copy(quaternion.current);
+        // Apply camera tilt (Rotate Up relative to drone)
+        camera.rotateX(THREE.MathUtils.degToRad(cameraTilt));
+    } else if (cameraMode === 'THIRD_PERSON') {
+        // Chase cam: Locked offset relative to drone rotation
+        // Offset: Up and Behind
+        const offset = new THREE.Vector3(0, 1.0, 2.5);
+        offset.applyQuaternion(quaternion.current);
+        camera.position.copy(position.current).add(offset);
+        camera.lookAt(position.current);
+    } else if (cameraMode === 'LOS') {
+        // Line of Sight: Static position
+        camera.position.set(0, 1.7, 5); // Standing height, slightly behind origin
+        camera.lookAt(position.current);
+    }
     
     // Telemetry
     if (state.clock.elapsedTime % 0.1 < 0.02) {

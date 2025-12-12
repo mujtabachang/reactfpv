@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Rates, RateProfile, InputMode, Calibration } from '../types';
-import { X, Gamepad2, Keyboard, Camera, Tv, Crosshair, ArrowLeftRight, CheckCircle } from 'lucide-react';
+import { Rates, RateProfile, InputMode, Calibration, CameraMode } from '../types';
+import { X, Gamepad2, Keyboard, Camera, Tv, Crosshair, ArrowLeftRight, CheckCircle, Eye, User, Video } from 'lucide-react';
 import { AXIS_MAP } from '../constants';
 
 interface SettingsPanelProps {
@@ -11,6 +11,8 @@ interface SettingsPanelProps {
   setInputMode: (mode: InputMode) => void;
   cameraTilt: number;
   setCameraTilt: (tilt: number) => void;
+  cameraMode: CameraMode;
+  setCameraMode: (mode: CameraMode) => void;
   analogStatic: boolean;
   setAnalogStatic: (enabled: boolean) => void;
   calibration: Calibration;
@@ -220,6 +222,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setInputMode, 
     cameraTilt, 
     setCameraTilt, 
+    cameraMode,
+    setCameraMode,
     analogStatic,
     setAnalogStatic,
     calibration,
@@ -282,11 +286,36 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </div>
                  </div>
 
+                 {/* Camera Settings */}
+                 <div>
+                    <label className="block text-xs text-gray-400 mb-2">Camera Mode</label>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setCameraMode('FPV')}
+                            className={`flex-1 flex items-center justify-center gap-2 p-2 rounded-lg border transition-all ${cameraMode === 'FPV' ? 'bg-blue-500/20 text-blue-400 border-blue-500' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
+                        >
+                            <Video size={16} /> <span className="text-xs font-bold">FPV</span>
+                        </button>
+                        <button 
+                            onClick={() => setCameraMode('THIRD_PERSON')}
+                            className={`flex-1 flex items-center justify-center gap-2 p-2 rounded-lg border transition-all ${cameraMode === 'THIRD_PERSON' ? 'bg-blue-500/20 text-blue-400 border-blue-500' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
+                        >
+                            <User size={16} /> <span className="text-xs font-bold">3rd Person</span>
+                        </button>
+                        <button 
+                            onClick={() => setCameraMode('LOS')}
+                            className={`flex-1 flex items-center justify-center gap-2 p-2 rounded-lg border transition-all ${cameraMode === 'LOS' ? 'bg-blue-500/20 text-blue-400 border-blue-500' : 'bg-gray-700 border-gray-600 text-gray-400'}`}
+                        >
+                            <Eye size={16} /> <span className="text-xs font-bold">LOS (Static)</span>
+                        </button>
+                    </div>
+                 </div>
+
                  <div className="flex gap-4">
-                     {/* Camera Tilt */}
-                     <div className="flex-1">
+                     {/* Camera Tilt - Only relevant for FPV */}
+                     <div className={`flex-1 transition-opacity ${cameraMode !== 'FPV' ? 'opacity-50 pointer-events-none' : ''}`}>
                          <div className="flex justify-between mb-1">
-                            <label className="block text-xs text-gray-400 flex items-center gap-1"><Camera size={14}/> Camera Tilt</label>
+                            <label className="block text-xs text-gray-400 flex items-center gap-1"><Camera size={14}/> FPV Tilt</label>
                             <span className="text-xs font-mono font-bold text-orange-400">{cameraTilt}°</span>
                          </div>
                          <input
@@ -301,7 +330,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                      </div>
 
                      {/* Analog Static Toggle */}
-                     <div className="flex-1 flex flex-col justify-between">
+                     <div className={`flex-1 flex flex-col justify-between ${cameraMode !== 'FPV' ? 'opacity-50 pointer-events-none' : ''}`}>
                          <label className="block text-xs text-gray-400 flex items-center gap-1 mb-1"><Tv size={14}/> Analog Static</label>
                          <button 
                             onClick={() => setAnalogStatic(!analogStatic)}
@@ -356,6 +385,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
              <ul className="list-disc pl-5 space-y-1">
                 <li>Toggle Menu: <kbd className="bg-gray-700 px-1 rounded">M</kbd> or <kbd className="bg-gray-700 px-1 rounded">ESC</kbd></li>
                 <li>Reset Position: <kbd className="bg-gray-700 px-1 rounded">R</kbd></li>
+                <li>Change Camera: <kbd className="bg-gray-700 px-1 rounded">C</kbd></li>
              </ul>
           </div>
         </div>

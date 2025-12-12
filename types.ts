@@ -54,3 +54,5 @@ export interface GamepadState {
 }
 
 export type InputMode = 'GAMEPAD' | 'KEYBOARD';
+
+export type CameraMode = 'FPV' | 'THIRD_PERSON' | 'LOS';

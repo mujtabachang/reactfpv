@@ -8,7 +8,7 @@ import HUD from './components/HUD';
 import SettingsPanel from './components/SettingsPanel';
 import StaticOverlay from './components/StaticOverlay';
 import { DEFAULT_RATES, DEFAULT_CALIBRATION } from './constants';
-import { Rates, InputMode, Calibration } from './types';
+import { Rates, InputMode, Calibration, CameraMode } from './types';
 
 const STORAGE_KEY = 'react_fpv_settings_v1';
 
@@ -27,6 +27,7 @@ const App = () => {
   const [rates, setRates] = useState<Rates>(initialSettings?.rates || DEFAULT_RATES);
   const [inputMode, setInputMode] = useState<InputMode>(initialSettings?.inputMode || 'GAMEPAD');
   const [cameraTilt, setCameraTilt] = useState(initialSettings?.cameraTilt ?? 25);
+  const [cameraMode, setCameraMode] = useState<CameraMode>(initialSettings?.cameraMode || 'FPV');
   const [analogStatic, setAnalogStatic] = useState(initialSettings?.analogStatic ?? false);
   const [calibration, setCalibration] = useState<Calibration>(initialSettings?.calibration || DEFAULT_CALIBRATION);
   
@@ -43,11 +44,12 @@ const App = () => {
       rates,
       inputMode,
       cameraTilt,
+      cameraMode,
       analogStatic,
       calibration
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
-  }, [rates, inputMode, cameraTilt, analogStatic, calibration]);
+  }, [rates, inputMode, cameraTilt, cameraMode, analogStatic, calibration]);
 
   const handleReset = useCallback(() => {
     setResetSignal(s => s + 1);
@@ -67,6 +69,14 @@ const App = () => {
 
       if (e.key.toLowerCase() === 'r') handleReset();
       if (e.key.toLowerCase() === 'm' || e.key === 'Escape') toggleSettings();
+      // Cycle camera modes with 'C'
+      if (e.key.toLowerCase() === 'c') {
+          setCameraMode(prev => {
+              if (prev === 'FPV') return 'THIRD_PERSON';
+              if (prev === 'THIRD_PERSON') return 'LOS';
+              return 'FPV';
+          });
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -101,6 +111,7 @@ const App = () => {
             rates={rates} 
             inputMode={inputMode}
             cameraTilt={cameraTilt}
+            cameraMode={cameraMode}
             setTelemetry={setTelemetry} 
             resetSignal={resetSignal}
             calibration={calibration}
@@ -109,8 +120,8 @@ const App = () => {
         <Stats className="!left-auto !right-0 !top-12" />
       </Canvas>
 
-      {/* Analog Static Overlay */}
-      {analogStatic && <StaticOverlay distance={telemetry.distance} />}
+      {/* Analog Static Overlay - only in FPV mode */}
+      {analogStatic && cameraMode === 'FPV' && <StaticOverlay distance={telemetry.distance} />}
 
       <HUD 
         speed={telemetry.speed}
@@ -131,6 +142,8 @@ const App = () => {
             setInputMode={setInputMode}
             cameraTilt={cameraTilt}
             setCameraTilt={setCameraTilt}
+            cameraMode={cameraMode}
+            setCameraMode={setCameraMode}
             analogStatic={analogStatic}
             setAnalogStatic={setAnalogStatic}
             calibration={calibration}
