@@ -130,6 +130,7 @@ const App = () => {
         fps={0} 
         controllerConnected={controllerConnected}
         inputMode={inputMode}
+        cameraMode={cameraMode}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onReset={handleReset}
       />

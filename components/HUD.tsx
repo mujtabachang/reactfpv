@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Settings, RefreshCw, Gamepad2, Keyboard, Info } from 'lucide-react';
-import { InputMode } from '../types';
+import { InputMode, CameraMode } from '../types';
 
 interface HUDProps {
   speed: number;
@@ -9,6 +10,7 @@ interface HUDProps {
   fps: number;
   controllerConnected: boolean;
   inputMode: InputMode;
+  cameraMode: CameraMode;
   onOpenSettings: () => void;
   onReset: () => void;
 }
@@ -20,6 +22,7 @@ const HUD: React.FC<HUDProps> = ({
   fps, 
   controllerConnected,
   inputMode,
+  cameraMode,
   onOpenSettings,
   onReset
 }) => {
@@ -58,11 +61,13 @@ const HUD: React.FC<HUDProps> = ({
         </div>
       </div>
 
-      {/* Center Crosshair */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-50">
-         <div className="w-4 h-0.5 bg-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
-         <div className="h-4 w-0.5 bg-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
-      </div>
+      {/* Center Crosshair - Only in FPV */}
+      {cameraMode === 'FPV' && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-50">
+             <div className="w-4 h-0.5 bg-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+             <div className="h-4 w-0.5 bg-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+          </div>
+      )}
 
       {/* Telemetry */}
       <div className="flex justify-between items-end text-white font-mono text-shadow-md">
