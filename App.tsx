@@ -28,6 +28,8 @@ const App = () => {
   const [rates, setRates] = useState<Rates>(initialSettings?.rates || DEFAULT_RATES);
   const [inputMode, setInputMode] = useState<InputMode>(initialSettings?.inputMode || 'GAMEPAD');
   const [cameraTilt, setCameraTilt] = useState(initialSettings?.cameraTilt ?? 25);
+  const [cameraFov, setCameraFov] = useState(initialSettings?.cameraFov ?? 120);
+  const [cameraAspectRatio, setCameraAspectRatio] = useState<string>(initialSettings?.cameraAspectRatio ?? 'native');
   const [cameraMode, setCameraMode] = useState<CameraMode>(initialSettings?.cameraMode || 'FPV');
   const [analogStatic, setAnalogStatic] = useState(initialSettings?.analogStatic ?? false);
   const [calibration, setCalibration] = useState<Calibration>(initialSettings?.calibration || DEFAULT_CALIBRATION);
@@ -51,6 +53,8 @@ const App = () => {
       rates,
       inputMode,
       cameraTilt,
+      cameraFov,
+      cameraAspectRatio,
       cameraMode,
       analogStatic,
       calibration,
@@ -59,7 +63,7 @@ const App = () => {
       dronePhysics
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
-  }, [rates, inputMode, cameraTilt, cameraMode, analogStatic, calibration, channelMap, windSettings, dronePhysics]);
+  }, [rates, inputMode, cameraTilt, cameraFov, cameraAspectRatio, cameraMode, analogStatic, calibration, channelMap, windSettings, dronePhysics]);
 
   const handleReset = useCallback(() => {
     setResetSignal(s => s + 1);
@@ -153,19 +157,38 @@ const App = () => {
     }
   }, []);
 
+  // Calculate letterbox dimensions based on aspect ratio
+  const getLetterboxStyle = () => {
+    if (cameraAspectRatio === 'native' || cameraMode !== 'FPV') return null;
+
+    const ratioMap: Record<string, number> = {
+      '4:3': 4 / 3,
+      '16:9': 16 / 9,
+    };
+
+    const targetRatio = ratioMap[cameraAspectRatio];
+    if (!targetRatio) return null;
+
+    return targetRatio;
+  };
+
+  const targetAspect = getLetterboxStyle();
+
   return (
     <div className="w-full h-screen bg-black relative select-none overflow-hidden font-sans">
-      <Canvas shadows camera={{ fov: 90, near: 0.1, far: 1000 }}>
+      <Canvas shadows camera={{ fov: cameraFov, near: 0.1, far: 1000 }}>
         <Sky sunPosition={[100, 20, 100]} />
         <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
         <fog attach="fog" args={['#1a1a1a', 10, 200]} />
-        
+
         <Environment />
-        
+
         <Drone
             rates={rates}
             inputMode={inputMode}
             cameraTilt={cameraTilt}
+            cameraFov={cameraFov}
+            cameraAspectRatio={cameraAspectRatio}
             cameraMode={cameraMode}
             setTelemetry={setTelemetry}
             resetSignal={resetSignal}
@@ -175,9 +198,36 @@ const App = () => {
             windSettings={windSettings}
             dronePhysics={dronePhysics}
         />
-        
+
         <Stats className="!left-auto !right-0 !top-12" />
       </Canvas>
+
+      {/* Letterbox/Pillarbox overlay for aspect ratio */}
+      {targetAspect && (
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+          <div
+            className="relative w-full h-full"
+            style={{
+              // CSS trick: use max dimensions to create letterboxing
+            }}
+          >
+            {/* Top/Bottom letterbox bars */}
+            <div className="absolute top-0 left-0 right-0 bg-black" style={{
+              height: `max(0px, calc((100vh - 100vw / ${targetAspect}) / 2))`
+            }} />
+            <div className="absolute bottom-0 left-0 right-0 bg-black" style={{
+              height: `max(0px, calc((100vh - 100vw / ${targetAspect}) / 2))`
+            }} />
+            {/* Left/Right pillarbox bars */}
+            <div className="absolute top-0 bottom-0 left-0 bg-black" style={{
+              width: `max(0px, calc((100vw - 100vh * ${targetAspect}) / 2))`
+            }} />
+            <div className="absolute top-0 bottom-0 right-0 bg-black" style={{
+              width: `max(0px, calc((100vw - 100vh * ${targetAspect}) / 2))`
+            }} />
+          </div>
+        </div>
+      )}
 
       {/* Analog Static Overlay - only in FPV mode */}
       {analogStatic && cameraMode === 'FPV' && <StaticOverlay distance={telemetry.distance} />}
@@ -203,6 +253,10 @@ const App = () => {
             setInputMode={setInputMode}
             cameraTilt={cameraTilt}
             setCameraTilt={setCameraTilt}
+            cameraFov={cameraFov}
+            setCameraFov={setCameraFov}
+            cameraAspectRatio={cameraAspectRatio}
+            setCameraAspectRatio={setCameraAspectRatio}
             cameraMode={cameraMode}
             setCameraMode={setCameraMode}
             analogStatic={analogStatic}

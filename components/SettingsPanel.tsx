@@ -18,6 +18,10 @@ interface SettingsPanelProps {
   setInputMode: (mode: InputMode) => void;
   cameraTilt: number;
   setCameraTilt: (tilt: number) => void;
+  cameraFov: number;
+  setCameraFov: (fov: number) => void;
+  cameraAspectRatio: string;
+  setCameraAspectRatio: (ratio: string) => void;
   cameraMode: CameraMode;
   setCameraMode: (mode: CameraMode) => void;
   analogStatic: boolean;
@@ -373,6 +377,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setInputMode,
     cameraTilt,
     setCameraTilt,
+    cameraFov,
+    setCameraFov,
+    cameraAspectRatio,
+    setCameraAspectRatio,
     cameraMode,
     setCameraMode,
     analogStatic,
@@ -488,6 +496,57 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </div>
                  </div>
 
+                 {/* Camera FOV and Aspect Ratio - Only relevant for FPV */}
+                 <div className={`transition-opacity ${cameraMode !== 'FPV' ? 'opacity-50 pointer-events-none' : ''}`}>
+                     <div className="flex gap-4">
+                       {/* FOV Slider */}
+                       <div className="flex-1">
+                         <div className="flex justify-between mb-1">
+                            <label className="block text-xs text-gray-400 flex items-center gap-1"><Camera size={14}/> FOV</label>
+                            <span className="text-xs font-mono font-bold text-orange-400">{cameraFov}°</span>
+                         </div>
+                         <input
+                            type="range"
+                            min="90"
+                            max="170"
+                            step="5"
+                            value={cameraFov}
+                            onChange={(e) => setCameraFov(parseInt(e.target.value))}
+                            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>90°</span>
+                            <span>130°</span>
+                            <span>170°</span>
+                        </div>
+                       </div>
+
+                       {/* Aspect Ratio */}
+                       <div className="w-32">
+                         <label className="block text-xs text-gray-400 mb-1">Aspect Ratio</label>
+                         <div className="flex flex-col gap-1">
+                           {[
+                             { value: '4:3', label: '4:3 (FPV)' },
+                             { value: '16:9', label: '16:9 (HD)' },
+                             { value: 'native', label: 'Native' },
+                           ].map((opt) => (
+                             <button
+                               key={opt.value}
+                               onClick={() => setCameraAspectRatio(opt.value)}
+                               className={`px-2 py-1 text-xs rounded border transition-colors ${
+                                 cameraAspectRatio === opt.value
+                                   ? 'bg-orange-500/20 text-orange-400 border-orange-500'
+                                   : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                               }`}
+                             >
+                               {opt.label}
+                             </button>
+                           ))}
+                         </div>
+                       </div>
+                     </div>
+                 </div>
+
                  <div className="flex gap-4">
                      {/* Camera Tilt - Only relevant for FPV */}
                      <div className={`flex-1 transition-opacity ${cameraMode !== 'FPV' ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -509,7 +568,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                      {/* Analog Static Toggle */}
                      <div className={`flex-1 flex flex-col justify-between ${cameraMode !== 'FPV' ? 'opacity-50 pointer-events-none' : ''}`}>
                          <label className="block text-xs text-gray-400 flex items-center gap-1 mb-1"><Tv size={14}/> Analog Static</label>
-                         <button 
+                         <button
                             onClick={() => setAnalogStatic(!analogStatic)}
                             className={`w-full py-2 rounded-lg font-bold text-sm transition-colors border ${analogStatic ? 'bg-green-500/20 text-green-400 border-green-500/50' : 'bg-gray-700 text-gray-400 border-gray-600 hover:bg-gray-600'}`}
                          >
