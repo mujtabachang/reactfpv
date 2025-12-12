@@ -247,19 +247,22 @@ const Bleachers = ({ position, rotation = [0, 0, 0] }: { position: [number, numb
 };
 
 export const Environment = () => {
-  // Generate random tree positions
-  const treePositions = useMemo(() => {
-    const positions: [number, number, number][] = [];
+  // Generate random tree positions and scales (memoized to prevent re-randomization)
+  const trees = useMemo(() => {
+    const data: { position: [number, number, number]; scale: number }[] = [];
     for (let i = 0; i < 40; i++) {
       const angle = Math.random() * Math.PI * 2;
       const distance = 80 + Math.random() * 150;
-      positions.push([
-        Math.cos(angle) * distance,
-        0,
-        Math.sin(angle) * distance
-      ]);
+      data.push({
+        position: [
+          Math.cos(angle) * distance,
+          0,
+          Math.sin(angle) * distance
+        ],
+        scale: 0.8 + Math.random() * 0.8
+      });
     }
-    return positions;
+    return data;
   }, []);
 
   return (
@@ -349,8 +352,8 @@ export const Environment = () => {
       {/* === DISTANT ENVIRONMENT === */}
 
       {/* Trees around the area */}
-      {treePositions.map((pos, i) => (
-        <Tree key={i} position={pos} scale={0.8 + Math.random() * 0.8} />
+      {trees.map((tree, i) => (
+        <Tree key={i} position={tree.position} scale={tree.scale} />
       ))}
 
       {/* Distant mountains/hills */}

@@ -7,8 +7,8 @@ import { Environment } from './components/World';
 import HUD from './components/HUD';
 import SettingsPanel from './components/SettingsPanel';
 import StaticOverlay from './components/StaticOverlay';
-import { DEFAULT_RATES, DEFAULT_CALIBRATION, DEFAULT_CHANNEL_MAP, DEFAULT_WIND_SETTINGS } from './constants';
-import { Rates, InputMode, Calibration, CameraMode, ChannelMap, WindSettings } from './types';
+import { DEFAULT_RATES, DEFAULT_CALIBRATION, DEFAULT_CHANNEL_MAP, DEFAULT_WIND_SETTINGS, DEFAULT_DRONE_PHYSICS } from './constants';
+import { Rates, InputMode, Calibration, CameraMode, ChannelMap, WindSettings, DronePhysicsSettings } from './types';
 import { hidController } from './services/webhid';
 
 const STORAGE_KEY = 'react_fpv_settings_v1';
@@ -33,6 +33,7 @@ const App = () => {
   const [calibration, setCalibration] = useState<Calibration>(initialSettings?.calibration || DEFAULT_CALIBRATION);
   const [channelMap, setChannelMap] = useState<ChannelMap>(initialSettings?.channelMap || DEFAULT_CHANNEL_MAP);
   const [windSettings, setWindSettings] = useState<WindSettings>(initialSettings?.windSettings || DEFAULT_WIND_SETTINGS);
+  const [dronePhysics, setDronePhysics] = useState<DronePhysicsSettings>(initialSettings?.dronePhysics || DEFAULT_DRONE_PHYSICS);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [resetSignal, setResetSignal] = useState(0);
@@ -54,10 +55,11 @@ const App = () => {
       analogStatic,
       calibration,
       channelMap,
-      windSettings
+      windSettings,
+      dronePhysics
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
-  }, [rates, inputMode, cameraTilt, cameraMode, analogStatic, calibration, channelMap, windSettings]);
+  }, [rates, inputMode, cameraTilt, cameraMode, analogStatic, calibration, channelMap, windSettings, dronePhysics]);
 
   const handleReset = useCallback(() => {
     setResetSignal(s => s + 1);
@@ -171,6 +173,7 @@ const App = () => {
             channelMap={channelMap}
             hidChannels={hidChannels}
             windSettings={windSettings}
+            dronePhysics={dronePhysics}
         />
         
         <Stats className="!left-auto !right-0 !top-12" />
@@ -212,6 +215,8 @@ const App = () => {
             gamepadAxes={gamepadAxes}
             windSettings={windSettings}
             setWindSettings={setWindSettings}
+            dronePhysics={dronePhysics}
+            setDronePhysics={setDronePhysics}
             onClose={() => setIsSettingsOpen(false)}
         />
       )}

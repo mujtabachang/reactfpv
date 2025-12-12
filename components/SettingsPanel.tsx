@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Rates, RateProfile, InputMode, Calibration, CameraMode, ChannelMap, WindSettings } from '../types';
-import { X, Gamepad2, Keyboard, Camera, Tv, Crosshair, Eye, User, Video, Usb, Shuffle, Wind, CloudRain } from 'lucide-react';
+import { Rates, RateProfile, InputMode, Calibration, CameraMode, ChannelMap, WindSettings, DronePhysicsSettings, DronePresetType } from '../types';
+import { DRONE_PRESETS } from '../constants';
+import { X, Gamepad2, Keyboard, Camera, Tv, Crosshair, Eye, User, Video, Usb, Shuffle, Wind, CloudRain, Plane } from 'lucide-react';
 
 // Helper to get wind direction label from angle
 const getWindDirectionLabel = (angle: number): string => {
@@ -29,8 +30,23 @@ interface SettingsPanelProps {
   gamepadAxes: number[];
   windSettings: WindSettings;
   setWindSettings: (settings: WindSettings) => void;
+  dronePhysics: DronePhysicsSettings;
+  setDronePhysics: (settings: DronePhysicsSettings) => void;
   onClose: () => void;
 }
+
+// Preset display names
+const PRESET_NAMES: Record<DronePresetType, string> = {
+  'WHOOP_65MM': '65mm Whoop',
+  'WHOOP_75MM': '75mm Whoop',
+  'TOOTHPICK_3IN': '3" Toothpick',
+  'FREESTYLE_5IN': '5" Freestyle',
+  'RACE_5IN': '5" Race',
+  'CINEWHOOP': 'Cinewhoop',
+  'LONG_RANGE_7IN': '7" Long Range',
+  'X_CLASS_10IN': '10" X-Class',
+  'CUSTOM': 'Custom',
+};
 
 const RateRow = ({ 
   label, 
@@ -369,6 +385,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     gamepadAxes,
     windSettings,
     setWindSettings,
+    dronePhysics,
+    setDronePhysics,
     onClose
 }) => {
   const [showCalibration, setShowCalibration] = useState(false);
@@ -626,6 +644,148 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </div>
               </div>
           )}
+
+          {/* Drone Physics Settings */}
+          <div className="mb-6 p-4 bg-gray-800 rounded-lg">
+            <h3 className="font-bold text-white uppercase mb-3 flex items-center gap-2"><Plane size={18}/> Quad Physics</h3>
+            <div className="flex flex-col gap-4">
+              {/* Preset Selection */}
+              <div>
+                <label className="block text-xs text-gray-400 mb-2">Quad Preset</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(DRONE_PRESETS) as DronePresetType[]).filter(p => p !== 'CUSTOM').map((preset) => (
+                    <button
+                      key={preset}
+                      onClick={() => {
+                        setDronePhysics({
+                          preset,
+                          ...DRONE_PRESETS[preset]
+                        });
+                      }}
+                      className={`px-2 py-2 text-xs rounded border transition-colors ${
+                        dronePhysics.preset === preset
+                          ? 'bg-orange-500/20 text-orange-400 border-orange-500'
+                          : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                      }`}
+                    >
+                      {PRESET_NAMES[preset]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Settings */}
+              <div className="space-y-3 pt-2 border-t border-gray-700">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">Custom Tuning</span>
+                  {dronePhysics.preset !== 'CUSTOM' && (
+                    <span className="text-xs text-gray-500">(Modifying will switch to Custom)</span>
+                  )}
+                </div>
+
+                {/* Mass */}
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <label className="block text-xs text-gray-400">Mass</label>
+                    <span className="text-xs font-mono font-bold text-orange-400">{(dronePhysics.mass * 1000).toFixed(0)}g</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.020"
+                    max="3.0"
+                    step="0.005"
+                    value={dronePhysics.mass}
+                    onChange={(e) => setDronePhysics({ ...dronePhysics, preset: 'CUSTOM', mass: parseFloat(e.target.value) })}
+                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+
+                {/* Max Thrust */}
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <label className="block text-xs text-gray-400">Max Thrust (per motor)</label>
+                    <span className="text-xs font-mono font-bold text-orange-400">{dronePhysics.maxThrust.toFixed(1)}N (~{(dronePhysics.maxThrust * 100).toFixed(0)}g)</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="20"
+                    step="0.1"
+                    value={dronePhysics.maxThrust}
+                    onChange={(e) => setDronePhysics({ ...dronePhysics, preset: 'CUSTOM', maxThrust: parseFloat(e.target.value) })}
+                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+
+                {/* Thrust to Weight Ratio Display */}
+                <div className="bg-gray-900/50 p-2 rounded text-center">
+                  <span className="text-xs text-gray-400">Thrust-to-Weight Ratio: </span>
+                  <span className="text-sm font-bold text-green-400">
+                    {((dronePhysics.maxThrust * 4) / (dronePhysics.mass * 9.81)).toFixed(1)}:1
+                  </span>
+                </div>
+
+                {/* Responsiveness */}
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <label className="block text-xs text-gray-400">Responsiveness (Snappiness)</label>
+                    <span className="text-xs font-mono font-bold text-orange-400">{dronePhysics.responsiveness.toFixed(0)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="25"
+                    step="1"
+                    value={dronePhysics.responsiveness}
+                    onChange={(e) => setDronePhysics({ ...dronePhysics, preset: 'CUSTOM', responsiveness: parseFloat(e.target.value) })}
+                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Sluggish</span>
+                    <span>Snappy</span>
+                  </div>
+                </div>
+
+                {/* Angular Drag */}
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <label className="block text-xs text-gray-400">Angular Drag (Rotation Stop)</label>
+                    <span className="text-xs font-mono font-bold text-orange-400">{dronePhysics.angularDrag.toFixed(1)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="10"
+                    step="0.5"
+                    value={dronePhysics.angularDrag}
+                    onChange={(e) => setDronePhysics({ ...dronePhysics, preset: 'CUSTOM', angularDrag: parseFloat(e.target.value) })}
+                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Floaty</span>
+                    <span>Locked In</span>
+                  </div>
+                </div>
+
+                {/* Drag Coefficient */}
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <label className="block text-xs text-gray-400">Air Drag</label>
+                    <span className="text-xs font-mono font-bold text-orange-400">{dronePhysics.dragCoefficient.toFixed(2)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.2"
+                    max="2.0"
+                    step="0.05"
+                    value={dronePhysics.dragCoefficient}
+                    onChange={(e) => setDronePhysics({ ...dronePhysics, preset: 'CUSTOM', dragCoefficient: parseFloat(e.target.value) })}
+                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Wind Settings */}
           <div className="mb-6 p-4 bg-gray-800 rounded-lg">

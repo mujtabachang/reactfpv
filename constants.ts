@@ -1,5 +1,5 @@
 
-import { Rates, Calibration, ChannelMap, WindSettings } from './types';
+import { Rates, Calibration, ChannelMap, WindSettings, DronePhysicsSettings, DronePresetType } from './types';
 
 export const GRAVITY = 9.81;
 export const DRAG = 0.5; // Air resistance
@@ -71,4 +71,78 @@ export const DEFAULT_WIND_SETTINGS: WindSettings = {
   gustStrength: 0,        // m/s
   gustFrequency: 0.5,     // Hz
   turbulenceScale: 0,     // 0-1
+};
+
+// Drone physics presets
+// Values: mass (kg), maxThrust per motor (N), dragCoefficient, angularDrag, responsiveness
+export const DRONE_PRESETS: Record<DronePresetType, Omit<DronePhysicsSettings, 'preset'>> = {
+  'WHOOP_65MM': {
+    mass: 0.025,          // 25g
+    maxThrust: 0.15,      // ~15g thrust per motor
+    dragCoefficient: 0.8,
+    angularDrag: 5.0,     // Whoops feel more dampened
+    responsiveness: 8,
+  },
+  'WHOOP_75MM': {
+    mass: 0.035,          // 35g
+    maxThrust: 0.25,      // ~25g thrust per motor
+    dragCoefficient: 0.9,
+    angularDrag: 4.5,
+    responsiveness: 9,
+  },
+  'TOOTHPICK_3IN': {
+    mass: 0.080,          // 80g
+    maxThrust: 1.2,       // ~120g thrust per motor
+    dragCoefficient: 0.6,
+    angularDrag: 3.5,
+    responsiveness: 12,
+  },
+  'FREESTYLE_5IN': {
+    mass: 0.650,          // 650g
+    maxThrust: 4.5,       // ~450g thrust per motor
+    dragCoefficient: 1.0,
+    angularDrag: 3.0,
+    responsiveness: 12,
+  },
+  'RACE_5IN': {
+    mass: 0.450,          // 450g (lighter race build)
+    maxThrust: 5.5,       // ~550g thrust per motor (more aggressive)
+    dragCoefficient: 0.8,
+    angularDrag: 2.0,     // Less drag = faster flips
+    responsiveness: 18,   // Very snappy
+  },
+  'CINEWHOOP': {
+    mass: 0.350,          // 350g with duct guards
+    maxThrust: 2.5,       // ~250g thrust per motor
+    dragCoefficient: 1.5, // Ducts add drag
+    angularDrag: 4.0,     // More stable for filming
+    responsiveness: 8,    // Smoother for cinema
+  },
+  'LONG_RANGE_7IN': {
+    mass: 0.900,          // 900g
+    maxThrust: 6.0,       // ~600g thrust per motor
+    dragCoefficient: 0.9,
+    angularDrag: 3.5,
+    responsiveness: 10,
+  },
+  'X_CLASS_10IN': {
+    mass: 2.5,            // 2.5kg
+    maxThrust: 15.0,      // ~1.5kg thrust per motor
+    dragCoefficient: 1.2,
+    angularDrag: 4.0,
+    responsiveness: 8,    // Heavy = slower response
+  },
+  'CUSTOM': {
+    mass: 0.650,
+    maxThrust: 4.5,
+    dragCoefficient: 1.0,
+    angularDrag: 3.0,
+    responsiveness: 12,
+  },
+};
+
+// Default drone physics (5" freestyle)
+export const DEFAULT_DRONE_PHYSICS: DronePhysicsSettings = {
+  preset: 'FREESTYLE_5IN',
+  ...DRONE_PRESETS['FREESTYLE_5IN'],
 };

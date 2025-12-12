@@ -2,10 +2,10 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Rates, InputMode, Calibration, CameraMode, ChannelMap, WindSettings } from '../types';
+import { Rates, InputMode, Calibration, CameraMode, ChannelMap, WindSettings, DronePhysicsSettings } from '../types';
 import { calculateRate, applyDeadband } from '../services/physics';
 import { normalizeInput } from '../services/gamepad';
-import { DronePhysicsEngine, PhysicsState } from '../services/dronePhysics';
+import { DronePhysicsEngine, PhysicsState, createSpecsFromSettings } from '../services/dronePhysics';
 
 interface DroneProps {
   rates: Rates;
@@ -18,6 +18,7 @@ interface DroneProps {
   channelMap: ChannelMap;
   hidChannels: number[];
   windSettings: WindSettings;
+  dronePhysics: DronePhysicsSettings;
 }
 
 // Visual Components
@@ -130,12 +131,18 @@ const DroneModel = ({ throttleRef }: { throttleRef: React.MutableRefObject<numbe
     )
 }
 
-const Drone: React.FC<DroneProps> = ({ rates, inputMode, cameraTilt, cameraMode, setTelemetry, resetSignal, calibration, channelMap, hidChannels, windSettings }) => {
+const Drone: React.FC<DroneProps> = ({ rates, inputMode, cameraTilt, cameraMode, setTelemetry, resetSignal, calibration, channelMap, hidChannels, windSettings, dronePhysics }) => {
   const { camera } = useThree();
   const meshRef = useRef<THREE.Group>(null);
 
   // Physics engine instance
   const physicsEngine = useMemo(() => new DronePhysicsEngine(), []);
+
+  // Update physics engine when drone physics settings change
+  useEffect(() => {
+    const specs = createSpecsFromSettings(dronePhysics);
+    physicsEngine.updateSpecs(specs);
+  }, [dronePhysics, physicsEngine]);
 
   // Physics state
   const physicsState = useRef<PhysicsState>(DronePhysicsEngine.createInitialState());

@@ -74,3 +74,15 @@ export interface WindSettings {
   gustFrequency: number;    // Hz - how often gusts occur (0-2)
   turbulenceScale: number;  // 0-1 - intensity of random turbulence
 }
+
+// Drone physics settings
+export type DronePresetType = 'WHOOP_65MM' | 'WHOOP_75MM' | 'TOOTHPICK_3IN' | 'FREESTYLE_5IN' | 'RACE_5IN' | 'CINEWHOOP' | 'LONG_RANGE_7IN' | 'X_CLASS_10IN' | 'CUSTOM';
+
+export interface DronePhysicsSettings {
+  preset: DronePresetType;
+  mass: number;              // kg
+  maxThrust: number;         // N per motor
+  dragCoefficient: number;   // 0-2
+  angularDrag: number;       // 0-10 (how fast rotation stops)
+  responsiveness: number;    // 1-20 (how snappy controls feel)
+}

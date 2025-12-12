@@ -13,6 +13,7 @@
  */
 
 import * as THREE from 'three';
+import { DronePhysicsSettings } from '../types';
 
 // Physical constants
 export const PHYSICS_CONSTANTS = {
@@ -21,44 +22,40 @@ export const PHYSICS_CONSTANTS = {
   AIR_VISCOSITY: 1.81e-5,  // Pa·s - dynamic viscosity of air
 };
 
-// Drone specifications (5" racing quad typical values)
+// Simplified drone specs used by physics engine
 export interface DroneSpecs {
   mass: number;              // kg - total mass including battery
-  armLength: number;         // m - distance from center to motor
-  motorKv: number;           // RPM/V - motor velocity constant
-  propDiameter: number;      // m - propeller diameter
-  propPitch: number;         // m - propeller pitch (theoretical advance per revolution)
-  batteryVoltage: number;    // V - battery voltage
   maxThrust: number;         // N - maximum thrust per motor
   dragCoefficient: number;   // dimensionless - aerodynamic drag coefficient
   frontalArea: number;       // m² - frontal cross-sectional area
-
-  // Moments of inertia (kg·m²)
-  inertia: {
-    xx: number;  // Roll axis
-    yy: number;  // Pitch axis
-    zz: number;  // Yaw axis
-  };
+  angularDrag: number;       // How quickly rotation stops
+  responsiveness: number;    // How snappy controls are
 }
 
 // Default specs for a 5" FPV racing quad
 export const DEFAULT_DRONE_SPECS: DroneSpecs = {
   mass: 0.65,               // 650g with battery
-  armLength: 0.11,          // 110mm arm length (220mm diagonal)
-  motorKv: 2400,            // Typical racing motor
-  propDiameter: 0.127,      // 5" = 127mm
-  propPitch: 0.076,         // 3" pitch
-  batteryVoltage: 14.8,     // 4S LiPo
-  maxThrust: 4.5,           // ~450g thrust per motor at full throttle
+  maxThrust: 4.5,           // ~450g thrust per motor
   dragCoefficient: 1.0,     // Approximate for quadcopter
   frontalArea: 0.01,        // ~100cm² frontal area
-
-  inertia: {
-    xx: 0.0008,   // Roll - smallest, quickest to rotate
-    yy: 0.0008,   // Pitch - similar to roll
-    zz: 0.0015,   // Yaw - largest, slowest to rotate
-  },
+  angularDrag: 3.0,         // How quickly rotation stops
+  responsiveness: 12,       // How snappy controls are
 };
+
+// Helper to create DroneSpecs from DronePhysicsSettings
+export function createSpecsFromSettings(settings: DronePhysicsSettings): DroneSpecs {
+  // Estimate frontal area based on mass (larger quads have larger frontal area)
+  const frontalArea = 0.005 + settings.mass * 0.01;
+
+  return {
+    mass: settings.mass,
+    maxThrust: settings.maxThrust,
+    dragCoefficient: settings.dragCoefficient,
+    frontalArea,
+    angularDrag: settings.angularDrag,
+    responsiveness: settings.responsiveness,
+  };
+}
 
 // Wind configuration
 export interface WindConfig {
@@ -259,20 +256,46 @@ export class DronePhysicsEngine {
       .add(thrustForce)
       .add(dragForce);
 
-    // --- Calculate Angular Motion ---
+    // --- Calculate Angular Motion with Inertia ---
 
-    // Simple rate-based rotation (direct control like acro mode)
-    // The desired rates are already in rad/s from the input
+    // Desired angular velocity from stick input (rad/s)
     const desiredAngularVel = new THREE.Vector3(pitchRate, yawRate, -rollRate);
 
-    // Smoothly approach desired angular velocity (simple low-pass filter)
-    const angularSmoothing = 10.0; // Higher = more responsive
-    const newAngularVelocity = state.angularVelocity.clone().lerp(desiredAngularVel, Math.min(1, angularSmoothing * dt));
+    // Calculate effective inertia factor based on mass
+    // This creates a normalized feel where heavier quads feel more sluggish
+    // but doesn't cause numerical instability with tiny masses
+    // Scale: 25g whoop = 0.3, 650g 5" = 1.0, 2.5kg X-class = 2.5
+    const inertiaFactor = 0.3 + (mass / 0.65) * 0.7;
 
-    // Apply angular drag when no input
-    const angularDragCoeff = 3.0;
-    if (desiredAngularVel.lengthSq() < 0.01) {
-      newAngularVelocity.multiplyScalar(Math.max(0, 1 - angularDragCoeff * dt));
+    // Calculate angular acceleration
+    // The error between desired and current angular velocity drives acceleration
+    const angularError = new THREE.Vector3().subVectors(desiredAngularVel, state.angularVelocity);
+
+    // Motor authority - how quickly motors can change angular velocity
+    // Scaled by responsiveness setting and inversely by inertia
+    const motorAuthority = this.specs.responsiveness / inertiaFactor;
+
+    // Angular acceleration from motor torque
+    const angularAccel = angularError.clone().multiplyScalar(motorAuthority);
+
+    // Apply angular drag (air resistance to rotation)
+    // Higher drag = rotation stops faster when stick is released
+    const dragAccel = state.angularVelocity.clone().multiplyScalar(-this.specs.angularDrag / inertiaFactor);
+    angularAccel.add(dragAccel);
+
+    // Clamp acceleration to prevent instability
+    const maxAccel = 100; // rad/s²
+    if (angularAccel.length() > maxAccel) {
+      angularAccel.normalize().multiplyScalar(maxAccel);
+    }
+
+    // Integrate angular velocity
+    const newAngularVelocity = state.angularVelocity.clone().addScaledVector(angularAccel, dt);
+
+    // Clamp angular velocity (max ~1800 deg/s)
+    const maxAngularSpeed = 30; // rad/s
+    if (newAngularVelocity.length() > maxAngularSpeed) {
+      newAngularVelocity.normalize().multiplyScalar(maxAngularSpeed);
     }
 
     // --- Integration ---
